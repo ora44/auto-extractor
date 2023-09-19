@@ -34,7 +34,7 @@ func getExtractor(ext string) ArchiveExtractor {
 }
 
 func event_listener(watcher *fsnotify.Watcher) {
-	wait := 1 * time.Second
+	wait := 2 * time.Second
 	var mutex sync.Mutex
 	timers := make(map[string]*time.Timer)
 
@@ -57,15 +57,28 @@ func event_listener(watcher *fsnotify.Watcher) {
 				continue
 			}
 
+			if strings.HasSuffix(event.Name, ".tmp") || strings.HasSuffix(event.Name, ".opdownload") {
+				continue
+			}
+
+			name := event.Name
+			if strings.HasSuffix(event.Name, ".part") {
+				parts := strings.SplitN(name, ".", 3)
+				if len(parts) != 3 {
+					continue
+				}
+				name = parts[0] + "." + strings.TrimSuffix(parts[2], ".part")
+			}
+
 			mutex.Lock()
-			t, ok := timers[event.Name]
+			t, ok := timers[name]
 			mutex.Unlock()
 
 			if !ok {
 				t = time.AfterFunc(wait, func() { callback(event) })
 
 				mutex.Lock()
-				timers[event.Name] = t
+				timers[name] = t
 				mutex.Unlock()
 			} else {
 				t.Reset(wait)
@@ -180,7 +193,7 @@ func unarrExtract(filepath string, dir_path string) {
 
 func process_file(filepath string) {
 
-	if strings.HasSuffix(filepath, ".tmp") || strings.HasSuffix(filepath, ".opdownload") {
+	if strings.HasSuffix(filepath, ".tmp") || strings.HasSuffix(filepath, ".opdownload") || strings.HasSuffix(filepath, ".part") {
 		return
 	}
 
